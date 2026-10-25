@@ -58,6 +58,7 @@ final case class Config(
     cacheTtl: FiniteDuration,
     bitbucketCfg: BitbucketCfg,
     bitbucketServerCfg: BitbucketServerCfg,
+    gitHubCfg: GitHubCfg,
     gitLabCfg: GitLabCfg,
     azureReposCfg: AzureReposCfg,
     githubApp: Option[GitHubApp],
@@ -71,7 +72,7 @@ final case class Config(
       case ForgeType.AzureRepos      => azureReposCfg
       case ForgeType.Bitbucket       => bitbucketCfg
       case ForgeType.BitbucketServer => bitbucketServerCfg
-      case ForgeType.GitHub          => GitHubCfg()
+      case ForgeType.GitHub          => gitHubCfg
       case ForgeType.GitLab          => gitLabCfg
       case ForgeType.Gitea           => GiteaCfg()
     }
@@ -135,7 +136,12 @@ object Config {
       useDefaultReviewers: Boolean
   ) extends ForgeSpecificCfg
 
+  /** @param apiCommits
+    *   create commits through the Git database API instead of pushing them; GitHub signs them when
+    *   Scala Steward authenticates as a GitHub App
+    */
   final case class GitHubCfg(
+      apiCommits: Boolean = false
   ) extends ForgeSpecificCfg
 
   final case class GitLabCfg(

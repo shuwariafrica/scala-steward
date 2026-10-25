@@ -272,6 +272,12 @@ object Cli {
       "Flag indicating if a merge request should remove the source branch when merging."
     ).orFalse
 
+  private val gitHubCfg: Opts[GitHubCfg] =
+    flag(
+      "github-api-commits",
+      "Whether to create commits through the GitHub API instead of pushing them; GitHub signs them when authenticated as a GitHub app; requires --do-not-fork; default: false"
+    ).orFalse.map(GitHubCfg.apply)
+
   private val gitLabCfg: Opts[GitLabCfg] =
     (gitlabMergeWhenPipelineSucceeds, gitlabRequiredReviewers, gitlabRemoveSourceBranch).mapN(
       GitLabCfg.apply
@@ -345,6 +351,7 @@ object Cli {
     cacheTtl,
     bitbucketCfg,
     bitbucketServerCfg,
+    gitHubCfg,
     gitLabCfg,
     azureReposCfg,
     gitHubApp,
@@ -352,7 +359,14 @@ object Cli {
     defaultMavenRepos,
     refreshBackoffPeriod,
     exitCodePolicy
-  ).mapN(Config.apply).map(Usage.Regular.apply)
+  ).mapN(Config.apply)
+    .validate(
+      s"--github-api-commits requires --${name.forgeType} ${GitHub.asString} and --do-not-fork"
+    )(cfg => !cfg.gitHubCfg.apiCommits || (cfg.forgeCfg.tpe === GitHub && cfg.forgeCfg.doNotFork))
+    .validate("--github-api-commits and --sign-commits are mutually exclusive")(cfg =>
+      !(cfg.gitHubCfg.apiCommits && cfg.gitCfg.signCommits)
+    )
+    .map(Usage.Regular.apply)
 
   private val validateRepoConfig: Opts[Usage] =
     Opts

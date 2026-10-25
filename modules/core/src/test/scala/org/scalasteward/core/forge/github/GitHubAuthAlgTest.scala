@@ -17,6 +17,9 @@
 package org.scalasteward.core.forge.github
 
 import better.files.File
+import cats.data.Kleisli
+import cats.effect.{IO, Ref}
+import cats.syntax.all.*
 import io.circe.literal.*
 import munit.CatsEffectSuite
 import org.http4s.circe.*
@@ -26,7 +29,7 @@ import org.http4s.syntax.literals.*
 import org.http4s.{AuthScheme, Credentials, HttpApp, Request}
 import org.scalasteward.core.data.Repo
 import org.scalasteward.core.mock.MockContext.context.{httpJsonClient, logger}
-import org.scalasteward.core.mock.{MockEff, MockEffOps, MockState}
+import org.scalasteward.core.mock.{MockCtx, MockEff, MockEffOps, MockState}
 import org.typelevel.ci.CIStringSyntax
 import scala.concurrent.duration.*
 
@@ -106,5 +109,36 @@ class GitHubAuthAlgTest extends CatsEffectSuite with Http4sDsl[MockEff] {
       repositories,
       List(Repo("fthomas", "base.g8"), Repo("octocat", "Hello-World"))
     )
+  }
+
+  test("authenticateApi reuses installation tokens and mints again for an uncovered repository") {
+    val mints = Ref.unsafe[IO, Int](0)
+    val app = HttpApp[MockEff] {
+      case GET -> Root / "app" / "installations" =>
+        Ok(json"""[{ "id": 1 }]""")
+      case POST -> Root / "app" / "installations" / "1" / "access_tokens" =>
+        Kleisli.liftF[IO, MockCtx, Unit](mints.update(_ + 1)) >> Ok(
+          json"""{ "token": $ghsToken }"""
+        )
+      case GET -> Root / "installation" / "repositories" =>
+        Ok(json"""{ "repositories": [{ "full_name": "fthomas/base.g8" }] }""")
+      case _ => NotFound()
+    }
+    val alg = new GitHubAuthAlg[MockEff](uri"http://localhost", 42L, pemFile)
+    val req = Request[MockEff](uri = uri"http://localhost/repos/fthomas/base.g8/git/blobs")
+    val uncovered = Request[MockEff](uri = uri"http://localhost/repos/octocat/Hello-World")
+    val bearer = Authorization(Credentials.Token(AuthScheme.Bearer, ghsToken))
+    val run = state.copy(clientResponses = app)
+    for {
+      requests <- List(req, req, req).traverse(alg.authenticateApi).runA(run)
+      afterCovered <- mints.get
+      unauthenticated <- alg.authenticateApi(uncovered).runA(run)
+      afterUncovered <- mints.get
+    } yield {
+      assert(requests.forall(hasAuthHeader(_, bearer)))
+      assertEquals(afterCovered, 1)
+      assert(unauthenticated.headers.get[Authorization].isEmpty)
+      assertEquals(afterUncovered, 2)
+    }
   }
 }

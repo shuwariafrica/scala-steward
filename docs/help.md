@@ -4,7 +4,7 @@ All command line arguments for the `scala-steward` application.
 
 ```
 Usage:
-    scala-steward --workspace <file> --repos-file <uri> [--repos-file <uri>]... [--git-author-name <string>] --git-author-email <string> [--git-author-signing-key <string>] --git-ask-pass <file> [--sign-commits] [--signoff] [--forge-type <forge-type>] [--forge-api-host <uri>] --forge-login <string> [--do-not-fork] [--add-labels] [--ignore-opts-files] [--env-var <name=value>]... [--process-timeout <duration>] [--whitelist <string>]... [--read-only <string>]... [--enable-sandbox | --disable-sandbox] [--max-buffer-size <integer>] [--repo-config <uri>]... [--disable-default-repo-config] [--scalafix-migrations <uri>]... [--disable-default-scalafix-migrations] [--artifact-migrations <uri>]... [--disable-default-artifact-migrations] [--cache-ttl <duration>] [--bitbucket-use-default-reviewers] [--bitbucket-server-use-default-reviewers] [--gitlab-merge-when-pipeline-succeeds] [--gitlab-required-reviewers <integer>] [--gitlab-remove-source-branch] [--azure-repos-organization <string>] [--github-app-id <integer> --github-app-key-file <file>] [--url-checker-test-url <uri>]... [--default-maven-repo <string>]... [--refresh-backoff-period <duration>] [--exit-code-success-if-any-repo-succeeds]
+    scala-steward --workspace <file> --repos-file <uri> [--repos-file <uri>]... [--git-author-name <string>] --git-author-email <string> [--git-author-signing-key <string>] --git-ask-pass <file> [--sign-commits] [--signoff] [--forge-type <forge-type>] [--forge-api-host <uri>] --forge-login <string> [--do-not-fork] [--add-labels] [--ignore-opts-files] [--env-var <name=value>]... [--process-timeout <duration>] [--whitelist <string>]... [--read-only <string>]... [--enable-sandbox | --disable-sandbox] [--max-buffer-size <integer>] [--repo-config <uri>]... [--disable-default-repo-config] [--scalafix-migrations <uri>]... [--disable-default-scalafix-migrations] [--artifact-migrations <uri>]... [--disable-default-artifact-migrations] [--cache-ttl <duration>] [--bitbucket-use-default-reviewers] [--bitbucket-server-use-default-reviewers] [--github-api-commits] [--gitlab-merge-when-pipeline-succeeds] [--gitlab-required-reviewers <integer>] [--gitlab-remove-source-branch] [--azure-repos-organization <string>] [--github-app-id <integer> --github-app-key-file <file>] [--url-checker-test-url <uri>]... [--default-maven-repo <string>]... [--refresh-backoff-period <duration>] [--exit-code-success-if-any-repo-succeeds]
     scala-steward validate-repo-config
 
 
@@ -72,6 +72,8 @@ Options and flags:
         Whether to assign the default reviewers to a bitbucket pull request; default: false
     --bitbucket-server-use-default-reviewers
         Whether to assign the default reviewers to a bitbucket server pull request; default: false
+    --github-api-commits
+        Whether to create commits through the GitHub API instead of pushing them; GitHub signs them when authenticated as a GitHub app; requires --do-not-fork; default: false
     --gitlab-merge-when-pipeline-succeeds
         Whether to merge a gitlab merge request when the pipeline succeeds
     --gitlab-required-reviewers <integer>

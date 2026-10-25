@@ -38,13 +38,15 @@ import org.scalasteward.core.edit.EditAlg
 import org.scalasteward.core.edit.hooks.HookExecutor
 import org.scalasteward.core.edit.scalafix.*
 import org.scalasteward.core.edit.update.ScannerAlg
+import org.scalasteward.core.forge.github.GitHubCommitPublisher
 import org.scalasteward.core.forge.{ForgeApiAlg, ForgeAuthAlg, ForgeRepoAlg, ForgeSelection}
-import org.scalasteward.core.git.{GenGitAlg, GitAlg}
+import org.scalasteward.core.git.{CommitSeriesAlg, GenGitAlg, GitAlg}
 import org.scalasteward.core.io.{FileAlg, ProcessAlg, WorkspaceAlg}
 import org.scalasteward.core.nurture.{
   NurtureAlg,
   PullRequestRepository,
   PullRequestService,
+  UpdateBranchPublisher,
   UpdateInfoUrlFinder
 }
 import org.scalasteward.core.persistence.{CachingKeyValueStore, JsonKeyValueStore}
@@ -200,6 +202,14 @@ object Context {
       implicit val repoCacheAlg: RepoCacheAlg[F] = new RepoCacheAlg[F](config)
       implicit val scannerAlg: ScannerAlg[F] = new ScannerAlg[F]
       implicit val editAlg: EditAlg[F] = new EditAlg[F]
+      implicit val updateBranchPublisher: UpdateBranchPublisher[F] =
+        if (config.gitHubCfg.apiCommits)
+          new GitHubCommitPublisher[F](
+            config.forgeCfg.apiHost,
+            forgeAuthAlg.authenticateApi,
+            new CommitSeriesAlg[F](workspaceAlg.repoDir)
+          )
+        else UpdateBranchPublisher.gitPush[F]
       implicit val nurtureAlg: NurtureAlg[F] = new NurtureAlg[F](config.forgeCfg)
       implicit val pruningAlg: PruningAlg[F] = new PruningAlg[F]
       implicit val reposFilesLoader: ReposFilesLoader[F] = new ReposFilesLoader[F]

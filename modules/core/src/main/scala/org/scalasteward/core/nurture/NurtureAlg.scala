@@ -43,6 +43,7 @@ final class NurtureAlg[F[_]](config: ForgeCfg)(implicit
     gitAlg: GitAlg[F],
     logger: Logger[F],
     pullRequestService: PullRequestService[F],
+    updateBranchPublisher: UpdateBranchPublisher[F],
     updateInfoUrlFinder: UpdateInfoUrlFinder[F],
     urlChecker: UrlChecker[F],
     F: Concurrent[F]
@@ -179,7 +180,7 @@ final class NurtureAlg[F[_]](config: ForgeCfg)(implicit
     else
       for {
         _ <- logger.info(s"Push ${commits.length} commit(s)")
-        _ <- gitAlg.push(data.repo, data.updateBranch)
+        _ <- updateBranchPublisher.publish(data.repo, data.baseBranch, data.updateBranch)
       } yield Updated
 
   private def dependenciesUpdatedWithNextAndCurrentVersion(

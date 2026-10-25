@@ -17,12 +17,13 @@
 package org.scalasteward.core.forge.github
 
 import better.files.File
-import cats.effect.Sync
+import cats.effect.{Ref, Sync}
 import cats.implicits.*
 import io.jsonwebtoken.Jwts
 import java.io.FileReader
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.{KeyFactory, PrivateKey, Security}
+import java.time.Instant
 import java.util.Date
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.util.io.pem.PemReader
@@ -37,6 +38,7 @@ import org.scalasteward.core.util.HttpJsonClient
 import org.typelevel.ci.CIStringSyntax
 import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.jdk.DurationConverters.*
 import scala.util.Using
 
 final class GitHubAuthAlg[F[_]](
@@ -63,22 +65,40 @@ final class GitHubAuthAlg[F[_]](
     getPrivateKey(bytes)
   }
 
-  override def authenticateApi(req: Request[F]): F[Request[F]] = for {
-    tokenRepos <- tokenRepos
-    maybeToken = tokenRepos
-      .find(_._1.exists(repo => req.uri.toString.contains(repo.toPath)))
-      .map(_._2.token)
-  } yield maybeToken match {
-    case Some(token) => req.putHeaders(Authorization(Token(AuthScheme.Bearer, token)))
-    case None        => req
-  }
+  override def authenticateApi(req: Request[F]): F[Request[F]] =
+    tokenFor(req.uri).map {
+      case Some(token) => req.putHeaders(Authorization(Token(AuthScheme.Bearer, token)))
+      case None        => req
+    }
 
-  override def authenticateGit(uri: Uri): F[Uri] = for {
-    tokenRepos <- tokenRepos
-    tokenMaybe = tokenRepos
-      .find(_._1.exists(repo => uri.toString.contains(repo.toPath)))
-      .map(_._2.token)
-  } yield util.uri.withUserInfo.replace(UserInfo("scala-steward", tokenMaybe))(uri)
+  override def authenticateGit(uri: Uri): F[Uri] =
+    tokenFor(uri).map { tokenMaybe =>
+      util.uri.withUserInfo.replace(UserInfo("scala-steward", tokenMaybe))(uri)
+    }
+
+  // Installation tokens expire one hour after they are created.
+  private val tokenReuse = 50.minutes
+
+  // ForgeAuthAlg.create is pure, so the cache cannot be allocated in F.
+  private val tokenCache = Ref.unsafe[F, Option[(Instant, List[(List[Repo], TokenOut)])]](None)
+
+  /** The token of the installation that reaches `uri`. Tokens are reused for [[tokenReuse]]; a
+    * `uri` no cached installation reaches mints them again, so that a repository added to an
+    * installation is found.
+    */
+  private def tokenFor(uri: Uri): F[Option[String]] = {
+    def find(tokenRepos: List[(List[Repo], TokenOut)]): Option[String] =
+      tokenRepos.find(_._1.exists(repo => uri.toString.contains(repo.toPath))).map(_._2.token)
+
+    (F.realTimeInstant, tokenCache.get).flatMapN { (now, cached) =>
+      cached
+        .filter { case (mintedAt, _) => now.isBefore(mintedAt.plus(tokenReuse.toJava)) }
+        .flatMap { case (_, tokenRepos) => find(tokenRepos) }
+        .fold(tokenRepos.flatTap(minted => tokenCache.set(Some((now, minted)))).map(find))(token =>
+          F.pure(Some(token))
+        )
+    }
+  }
 
   private def tokenRepos = for {
     jwt <- createJWT(tokenTtl)

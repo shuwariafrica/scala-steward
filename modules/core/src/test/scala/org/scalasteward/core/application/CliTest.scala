@@ -22,6 +22,7 @@ import munit.FunSuite
 import org.http4s.syntax.literals.*
 import org.scalasteward.core.application.Cli.ParseResult.*
 import org.scalasteward.core.application.Cli.{EnvVar, Usage}
+import org.scalasteward.core.application.Config.GitHubCfg
 import org.scalasteward.core.application.ExitCodePolicy.{
   SuccessIfAnyRepoSucceeds,
   SuccessOnlyIfAllReposSucceed
@@ -217,6 +218,39 @@ class CliTest extends FunSuite {
     )
     val Error(errorMsg) = Cli.parseArgs(params.flatten): @unchecked
     assert(clue(errorMsg).startsWith("azure-repos, bitbucket-server do not support fork mode"))
+  }
+
+  test("parseArgs: --github-api-commits") {
+    val params = minimumRequiredParams ++ List(List("--github-api-commits"), List("--do-not-fork"))
+    val Success(Usage.Regular(obtained)) = Cli.parseArgs(params.flatten): @unchecked
+    assert(obtained.gitHubCfg.apiCommits)
+    assert(obtained.forgeSpecificCfg == GitHubCfg(apiCommits = true))
+  }
+
+  test("parseArgs: --github-api-commits in fork mode") {
+    val params = minimumRequiredParams ++ List(List("--github-api-commits"))
+    val Error(errorMsg) = Cli.parseArgs(params.flatten): @unchecked
+    assert(clue(errorMsg).startsWith("--github-api-commits requires --forge-type github"))
+  }
+
+  test("parseArgs: --github-api-commits with another forge") {
+    val params = minimumRequiredParams ++ List(
+      List("--github-api-commits"),
+      List("--do-not-fork"),
+      List("--forge-type", "gitlab")
+    )
+    val Error(errorMsg) = Cli.parseArgs(params.flatten): @unchecked
+    assert(clue(errorMsg).startsWith("--github-api-commits requires --forge-type github"))
+  }
+
+  test("parseArgs: --github-api-commits with --sign-commits") {
+    val params = minimumRequiredParams ++ List(
+      List("--github-api-commits"),
+      List("--do-not-fork"),
+      List("--sign-commits")
+    )
+    val Error(errorMsg) = Cli.parseArgs(params.flatten): @unchecked
+    assert(clue(errorMsg).startsWith("--github-api-commits and --sign-commits"))
   }
 
   test("parseArgs: validate pull request labeling disabled") {

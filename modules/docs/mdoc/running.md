@@ -205,6 +205,22 @@ pipelines:
 
 * In the Pipelines UI, configure the pipeline to run on a schedule (e.g. daily)
 
+### Verified commits with a GitHub App
+
+With `--github-api-commits` and `--do-not-fork`, Scala Steward creates each commit of an update
+branch through GitHub's [Git database API](https://docs.github.com/en/rest/git) instead of pushing
+it. When it authenticates as a GitHub App - through `--github-app-id` and `--github-app-key-file`,
+or with an App installation token as the password `--git-ask-pass` returns - GitHub signs these
+commits as the App. They show as verified and satisfy rules that require signed commits, without
+a signing key or a user account for the bot. The App needs read and write access to the
+repository's contents.
+
+The commits are authored and committed by the App. `--git-author-*` applies only to the local
+commits Scala Steward prepares before publishing them, and `--sign-commits` cannot be combined
+with this option. Recreated commits get new SHAs; a later commit of the same update that names an
+earlier one, such as an entry a post-update hook adds to `.git-blame-ignore-revs`, is rewritten
+to the published SHA.
+
 ### Running On-premise
 
 #### GitHub Enterprise
