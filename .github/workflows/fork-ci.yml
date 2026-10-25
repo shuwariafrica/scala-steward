@@ -1,0 +1,41 @@
+name: Fork CI
+
+# Upstream's ci.yml and clean.yml stay unedited, so upstream merges never conflict in them; they are
+# disabled through the Actions API instead.
+on:
+  push:
+    branches: [shuwari]
+  pull_request:
+    branches: [shuwari]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+
+      # EditAlgTest runs a real scalafmt.
+      - uses: coursier/setup-action@648df969f41ef15fda2baba8b37f9fa3d16390a3 # v3.0.4
+        with:
+          apps: scalafmt
+
+      - name: Check and test
+        run: sbt headerCheckAll scalafmtCheckAll scalafmtSbtCheck +test docs/mdoc docs/checkDocs
